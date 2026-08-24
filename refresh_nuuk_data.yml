@@ -1,0 +1,43 @@
+name: Refresh Nuuk GEM data -> Earth Engine asset
+
+"on":
+  schedule:
+    # Runs at 03:00 UTC on the 1st of every month. GEM's own data is
+    # monthly-cadence CTD casts, so a monthly refresh matches the real
+    # data's own update frequency - running more often would just be
+    # re-fetching the same numbers.
+    - cron: '0 3 1 * *'
+  workflow_dispatch: {}   # lets you trigger a run manually from the
+                          # Actions tab, e.g. to test before trusting
+                          # the schedule
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests pandas earthengine-api
+
+      - name: Write Earth Engine service account key to file
+        run: echo "${{ secrets.EE_SERVICE_ACCOUNT_KEY_JSON }}" > ee_key.json
+
+      - name: Run refresh script
+        env:
+          GEM_API_KEY: ${{ secrets.GEM_API_KEY }}
+          EE_ASSET_ID: ${{ secrets.EE_ASSET_ID }}
+          EE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.EE_SERVICE_ACCOUNT_EMAIL }}
+          EE_SERVICE_ACCOUNT_KEY_PATH: ee_key.json
+        run: python refresh_nuuk_data.py
+
+      - name: Clean up key file
+        if: always()
+        run: rm -f ee_key.json
